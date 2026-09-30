@@ -1,0 +1,79 @@
+# Example minio-manager configuration.
+#
+# The YAML file is the single source of truth: `minio-manager apply` computes the
+# diff between this desired state and the live MinIO server and applies only the
+# necessary changes. Validate it without touching MinIO:
+#
+#   minio-manager validate --config configs/example.yaml
+#
+# Connection settings can be overridden by flags/ENV (priority: flag > ENV > file).
+
+minio:
+  endpoint: "minio.example.com:9000"   # or env MINIO_ENDPOINT
+  access_key: "admin"                   # or env MINIO_ACCESS_KEY
+  secret_key: "password"                # or env MINIO_SECRET_KEY
+  tls: false
+
+buckets:
+  - name: "app-data"
+    description: "Primary application data store"   # optional, documentation only
+    region: "us-east-1"
+    versioning: true
+    object_locking: false
+    quota_gb: 10                        # 0 = no quota
+    lifecycle_days: 90                  # 0 = no lifecycle expiration rule
+    tags:
+      env: "production"
+      team: "backend"
+
+  - name: "app-logs"
+    description: "Short-lived application logs, expired after 30 days"
+    region: "us-east-1"
+    versioning: false
+    quota_gb: 0
+    lifecycle_days: 30
+    tags:
+      env: "production"
+      team: "platform"
+
+users:
+  - name: "alice"
+    description: "Backend service account with read/write access"
+    password: "s3cr3t-change-me"        # plain value...
+    policies:
+      - "readwrite-app-data"
+    enabled: true
+
+  - name: "bob"
+    description: "Read-only auditor account"
+    # ...or a Vault reference, resolved at load time when --vault-addr is set:
+    #   password: "vault://secret/minio/bob#password"
+    password: "ch4nge-me-too"
+    policies:
+      - "readonly-app-data"
+    enabled: true
+
+policies:
+  - name: "readwrite-app-data"
+    description: "Full object access to the app-data bucket"
+    statements:
+      - effect: "Allow"
+        actions:
+          - "s3:GetObject"
+          - "s3:PutObject"
+          - "s3:DeleteObject"
+          - "s3:ListBucket"
+        resources:
+          - "arn:aws:s3:::app-data"
+          - "arn:aws:s3:::app-data/*"
+
+  - name: "readonly-app-data"
+    description: "Read-only access to the app-data bucket"
+    statements:
+      - effect: "Allow"
+        actions:
+          - "s3:GetObject"
+          - "s3:ListBucket"
+        resources:
+          - "arn:aws:s3:::app-data"
+          - "arn:aws:s3:::app-data/*"

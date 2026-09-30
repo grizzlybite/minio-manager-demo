@@ -1,0 +1,38 @@
+# golangci-lint v2 configuration.
+# Equivalent to the v1 layout in AGENTS.md §13, converted to the v2 schema
+# required by golangci-lint v2.x (gofmt/goimports are now "formatters").
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - misspell
+    - noctx
+    - wrapcheck
+  settings:
+    wrapcheck:
+      # Our own internal packages already return contextualized errors
+      # (ConfigError/MinioError or fmt.Errorf-wrapped at their boundaries), so
+      # re-wrapping them at call sites adds no value. wrapcheck still applies to
+      # genuinely external libraries (cobra, viper, minio, vault, ...).
+      ignore-package-globs:
+        - github.com/yourorg/minio-manager/**
+        # errgroup.Wait() is a pass-through of the first goroutine error, which
+        # our code has already produced and wrapped.
+        - golang.org/x/sync/errgroup
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test.go
+        linters:
+          - errcheck
+          - wrapcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
